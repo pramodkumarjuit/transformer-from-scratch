@@ -97,7 +97,7 @@ def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_
   eos_idx = tokenizer_tgt.token_to_id['EOS']
 
   # precompute the encoder output and reuse it for every token we get from the decoder
-  encouder_output = model.encode(source, source_mask)
+  encoder_output = model.encode(source, source_mask)
 
   # initialize the decoder input with the sos token
   decoder_input = torch.empty(1,1).fill_(sos_idx).type_as(source).to(device)
@@ -110,7 +110,7 @@ def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_
     decoder_mask = causal_mask(decoder_input.size(1).type_as(source_mask)).to(device)
 
     # calculate the output of the decoder
-    out = model.decode(encouder_output, source_mask, decoder_input, decoder_mask)
+    out = model.decode(encoder_output, source_mask, decoder_input, decoder_mask)
 
     # get the max token
     prob = model.project(out[:,1])
@@ -118,7 +118,7 @@ def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_
     #select the token with the max probability (because it is a greedy search)
     _, next_word = torch.max(prob, dim=1)
 
-    decoder_input = torch.cat(decoder_input, torch.empty(1,1).type_as(source).fill_(next_word.item()).to(device), dim=1)
+    decoder_input = torch.cat((decoder_input, torch.empty(1,1).type_as(source).fill_(next_word.item()).to(device)), dim=1)
 
     if next_word == eos_idx:
       break
@@ -219,7 +219,7 @@ def train_model(config):
       global_step += 1 # used for tensorboard
 
     # save model at the end of every epoch
-    model_filename = get_weights_file_path(config, f'(epoch:02d)')
+    model_filename = get_weights_file_path(config, f'{epoch:02d}')
     torch.save({
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
