@@ -92,6 +92,68 @@ def get_model(config, vocab_src_len, vocab_tgt_len):
   model = build_transformer(vocab_src_len, vocab_tgt_len, config ['seq_len'], config ['seq_len'], config['d_model'])
   return model
 
+def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_len, device):
+  sos_idx = tokenizer_tgt.token_to_id['SOS']
+  eos_idx = tokenizer_tgt.token_to_id['EOS']
+
+  # precompute the encoder output and reuse it for every token we get from the decoder
+  encouder_output = model.encode(source, source_mask)
+
+  # initialize the decoder input with the sos token
+  decoder_input = torch.empty(1,1).fill_(sos_idx).type_as(source).to(device)
+
+  while True:
+    if decoder_input.size(1) == max_len:
+      break
+
+    # build mask for the target (decoder input)
+    decoder_mask = causal_mask(decoder_input.size(1).type_as(source_mask)).to(device)
+
+    # calculate the output of the decoder
+    out = model.decode(encouder_output, source_mask, decoder_input, decoder_mask)
+
+    # get the max token
+    prob = model.project(out[:,1])
+
+    #select the token with the max probability (because it is a greedy search)
+    _, next_word = torch.max(prob, dim=1)
+
+    decoder_input = torch.cat(decoder_input, torch.empty(1,1).type_as(source).fill_(next_word.item()).to(device), dim=1)
+
+    if next_word == eos_idx:
+      break
+
+  # remove the batch dim from the output which is decoder_input
+  return decoder_input.squeeze(0)
+
+def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, device, print_msg, global_state, write, num_examples=2):
+  model.eval()
+  count = 0
+  console_width = 80
+
+
+  with torch.no_grad():
+    for batch in validation_ds:
+      count += 1
+      encoder_input = batch['encoder_input'].to(device)
+      encoder_mask = batch['encoder_mask'].to(device)
+
+      assert encoder_input.size(0) == 1, "Batch size must be 1 for validation"
+      model_out = greedy_decode(model, encoder_input, encoder_mask, tokenizer_src, tokenizer_tgt, max_len, device)
+
+      source_text = batch['src_text'][0]
+      target_text = batch['tgt_text'][0]
+      model_out_text = tokenizer_tgt.decode(model_out.detach().cpu().numpy())
+
+      # print to console
+      print_msg('-'*console_width)
+      print_msg(f'SOURCE: {source_text}')
+      print_msg(f'TARGET: {target_text}')
+      print_msg(f'PREDICTED: {model_out_text}')
+
+      if count == num_examples:
+        break
+
 def train_model(config):
   device = torch.device ('cuda' if torch.cuda.is_available() else 'cpu')
   print(f'Using  device: {device}')
