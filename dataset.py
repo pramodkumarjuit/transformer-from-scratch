@@ -27,7 +27,7 @@ class BilingualDataset(Dataset):
     src_text = src_target_pair['translation'][self.src_lang]
     tgt_text = src_target_pair['translation'][self.tgt_lang]
 
-    # tokenizer.encode() method to convert text to tokens
+    # tokenizer.encode() method to convert text into tokens
     enc_input_tokens = self.tokenizer_src.encode(src_text).ids
     dec_input_tokens = self.tokenizer_tgt.encode(tgt_text).ids
 
@@ -48,7 +48,7 @@ class BilingualDataset(Dataset):
         dim=0
     )
 
-    # [EOS] in decoder input because the model learns to generate <EOS>.
+    # Add only [SOS] in decoder input because the model learns to generate <EOS>.
     #     - Target Sequence: ["Hello", "world", "[EOS]"]
     #     - Decoder Input (shifted right): ["[SOS]", "Hello", "world"]
     decoder_input = torch.cat(
@@ -80,7 +80,7 @@ class BilingualDataset(Dataset):
         "encoder_mask": (encoder_input != self.pad_token).unsqueeze(0).unsqueeze(0).int(), # (1,1, seq_len)
         "decoder_mask": (decoder_input != self.pad_token).unsqueeze(0).int() & causal_mask(decoder_input.size(0)), # (1, seq_len) & (1, seq_len, seq_len)
         "label": label, # (seq_len)
-        "srcs_text": src_text,
+        "src_text": src_text,
         "tgt_text": tgt_text
     }
 
