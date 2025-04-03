@@ -244,9 +244,9 @@ class Transformer(nn.Module):
     tgt = self.tgt_pos(tgt)
     return self.decoder(tgt, encoder_output, src_mask, tgt_mask) # Decoder's fwd function
 
-    def project(self, x):
-        # (batch, seq_len, vocab_size)
-        return self.projection_layer(x)
+  def project(self, x):
+      # (batch, seq_len, vocab_size)
+      return self.projection_layer(x)
 
 def build_transformer(src_vocab_size: int,
                       tgt_vocab_size: int,
